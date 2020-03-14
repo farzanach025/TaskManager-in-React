@@ -90,4 +90,18 @@
     -webkit-text-decoration-line: line-through; /* Safari */
     text-decoration-line: line-through;
 }
+.task-title {
+    align-self: flex-end;
+    font-size: 21px;
+}
+.search-icon-container {
+    background: #d9dfeb;
+    border-right-width: 0px;
+}
+.search-input {
+    background: #d9dfeb;
+    border-left-width: 0px;
+    color: #647278;
+    padding-left: 0px;
+}
 

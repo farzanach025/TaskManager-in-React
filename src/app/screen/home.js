@@ -1,9 +1,9 @@
 import React from 'react'
-import {Button, Card, FormCheck, Modal, Navbar} from "react-bootstrap";
+import {Button, Card, FormCheck, FormControl, InputGroup, Modal, ModalBody, ModalFooter, Navbar} from "react-bootstrap";
 import { IoMdAdd } from "react-icons/io";
 import {performRequest} from "../ services/apiHandler";
 import { GoPencil } from "react-icons/go";
-import { FaTrashAlt } from "react-icons/fa";
+import { FaTrashAlt, FaSearch } from "react-icons/fa";
 
 class Home extends React.Component {
 
@@ -11,12 +11,16 @@ class Home extends React.Component {
         super(props);
         this.state = {
             new_task_modal: false,
+            delete_task_modal: false,
+            edit_task_modal: false,
             name: '',
+            search: '',
             image: '',
             total_tasks: 0,
             tasks_completed: 0,
             tasks: [],
             latest_tasks: [],
+            tasks_backup: [],
             new_task_name:'',
             edit_task_name: '',
             task_error: '',
@@ -70,8 +74,27 @@ class Home extends React.Component {
         });
     };
 
+    deleteHandler = (task, index) =>{
+        this.setState({
+            delete_task_modal: true,
+            edit_task_name: task.name,
+            selected_task: task,
+            selected_index: index
+        });
+    };
+
+    handleSearch = (e) =>{
+        this.setState({
+            [e.target.name]: e.target.value,
+            // tasks_backup:
+        });
+        // this.state.tasks.map(item =>{
+        //     e.target.value
+        // })
+    };
+
     saveTask = () =>{
-        performRequest('post', '/task', {name: this.state.new_task} )
+        performRequest('post', '/task', {name: this.state.new_task_name} )
             .then(response => {
                 console.log("HOME 3", response)
                 let tasks = [];
@@ -119,7 +142,30 @@ class Home extends React.Component {
     };
 
     deleteTask = () => {
-
+        performRequest('delete', '/task/'+ this.state.selected_task._id)
+            .then(response => {
+                console.log("HOME 5", response)
+                this.state.tasks.splice(this.state.selected_index, 1);
+                let tasks = [];
+                let i = 0;
+                this.state.tasks.map(item =>{
+                        item.completed && i++;
+                        tasks.push(item)
+                    }
+                );
+                this.setState({
+                    tasks_completed: i,
+                    delete_task_modal: false,
+                    edit_task_name: '',
+                    task_error: '',
+                    tasks: tasks,
+                    total_tasks: tasks.length
+                })
+            }).catch(error=>{
+            this.setState({task_error: error.response.data.msg,
+                delete_task_modal: false
+            });
+        })
     };
 
     render() {
@@ -136,7 +182,7 @@ class Home extends React.Component {
 
                 {this.state.tasks.length > 0 ?
                     <div className='container'>
-                        <div className='row'>
+                        <div className='row mb-2'>
                             <div className='col-lg-4 col-md-4 col-sm-12 mb-3'>
                                 <Card className='p-4 card-8 radius10'>
                                     <span className='mb-3 text-center card-heading'>Tasks completed</span>
@@ -160,7 +206,29 @@ class Home extends React.Component {
                                 </Card>
                             </div>
                         </div>
-                        <Button className='mb-2' onClick={()=>this.setState({new_task_modal: true})}><IoMdAdd size={13} /> New Task</Button>
+                        <div className='row'>
+                            <div className='col-lg-6 col-sm-12 mb-sm-3 task-title'>
+                                <span>Tasks</span>
+                            </div>
+                            <div className='col-lg-4 col-sm-12 mb-sm-3'>
+                                <InputGroup>
+                                    <InputGroup.Prepend>
+                                        <InputGroup.Text id="basic-addon1" className='search-icon-container'>
+                                            <FaSearch size={15} color={'#647278'}/></InputGroup.Text>
+                                    </InputGroup.Prepend>
+                                    <FormControl
+                                        className='search-input'
+                                        placeholder="Search by task name"
+                                        value={this.state.search}
+                                        name="search"
+                                        onChange={(e) =>this.handleSearch(e)}
+                                    />
+                                </InputGroup>
+                            </div>
+                            <div className='col-lg-2 col-sm-12 mb-sm-3'>
+                                <Button onClick={()=>this.setState({new_task_modal: true})}><IoMdAdd size={13} className='mb-1'/> New Task</Button>
+                            </div>
+                        </div>
 
                         <Card className='mb-5 card-8 radius10'>
                             {this.state.tasks.map((item, index) =>
@@ -171,7 +239,7 @@ class Home extends React.Component {
                                     </div>
                                     <div className='col-lg-2 text-right'>
                                         <GoPencil size={20} color={'#647278'} className='mr-3 pointer' onClick={() => this.editHandle(item, index)}/>
-                                        <FaTrashAlt color={'#647278'} size={20}/>
+                                        <FaTrashAlt className='pointer' color={'#647278'} size={20} onClick={() => this.deleteHandler(item, index)}/>
                                     </div>
 
                                 </div>
@@ -188,7 +256,7 @@ class Home extends React.Component {
                 }
 
                 <Modal show={this.state.new_task_modal}>
-                    <Card className='p-4 radius10'>
+                    <Card className='p-4'>
                         <span className='mb-3 text-center'><IoMdAdd size={15} />New Task</span>
                         <input type="name" className="form-control" placeholder="Task Name" name="new_task_name" required
                                value={this.state.new_task_name} onChange={(e)=> this.handleChange(e)}/>
@@ -198,13 +266,23 @@ class Home extends React.Component {
                 </Modal>
 
                 <Modal show={this.state.edit_task_modal}>
-                    <Card className='p-4 radius10'>
+                    <Card className='p-4'>
                         <span className='mb-3'><GoPencil size={15} className='mb-1 mr-1'/>Edit Task</span>
                         <input type="name" className="form-control" placeholder="Task Name" name="edit_task_name" required
                                value={this.state.edit_task_name} onChange={(e)=> this.handleChange(e)}/>
                         {this.state.task_error && <span className='error-msg'>{this.state.task_error}</span>}
                         <Button className='mb-2 mt-3' onClick={this.editTask}><GoPencil size={13} className='mb-1 mr-1'/> Edit Task</Button>
                     </Card>
+                </Modal>
+
+                <Modal show={this.state.delete_task_modal}>
+                    <ModalBody>
+                        <span className='mb-3'>Are you sure to delete this Task?</span>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button className='mb-2' onClick={()=>this.setState({delete_task_modal: false})}>Cancel</Button>
+                        <Button className='mb-2' variant="danger" onClick={this.deleteTask}><FaTrashAlt size={13} className='mb-1 mr-1'/> Delete Task</Button>
+                    </ModalFooter>
                 </Modal>
             </div>
         )
