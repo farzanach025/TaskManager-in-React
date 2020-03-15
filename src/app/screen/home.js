@@ -168,35 +168,11 @@ class Home extends React.Component {
                         tasks: tasks
                     })
                 }).catch(error=>{
-                let data = {
-                    "name": this.state.edit_task_name,
-                    "completed": this.state.selected_task.completed
-                };
-                performRequest('put', '/task/'+ this.state.selected_task._id, null, data)
-                    .then(response => {
-                        console.log("HOME 4", response)
-                        let tasks = [];
-                        let i = 0;
-                        this.state.tasks.map(item =>{
-                                item.completed && i++;
-                                tasks.push(item)
-                            }
-                        );
-                        tasks[this.state.selected_index] = response.data.task;
-                        this.setState({
-                            tasks_completed: i,
-                            edit_task_modal: false,
-                            edit_task_name: '',
-                            task_error: '',
-                            tasks: tasks
-                        })
-                    }).catch(error=>{
-                    this.setState({task_error: error.response.data.msg});
-                })
+                this.setState({task_error: error.response.data.msg,
+                    delete_task_modal: false
+                });
             })
-        }else {
-            this.setState({task_error: "Enter a valid task"});
-        }
+        };
 
     };
 
