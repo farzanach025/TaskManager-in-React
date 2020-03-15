@@ -1,9 +1,22 @@
 import React from 'react'
-import {Button, Card, FormCheck, FormControl, InputGroup, Modal, ModalBody, ModalFooter, Navbar} from "react-bootstrap";
+import {
+    Button,
+    Card,
+    FormCheck,
+    FormControl,
+    InputGroup,
+    Modal,
+    ModalBody,
+    ModalFooter,
+    Navbar,
+    Spinner
+} from "react-bootstrap";
 import { IoMdAdd } from "react-icons/io";
 import {performRequest} from "../ services/apiHandler";
 import { GoPencil } from "react-icons/go";
 import { FaTrashAlt, FaSearch } from "react-icons/fa";
+import { MdClose } from "react-icons/md";
+import ReactMinimalPieChart from "react-minimal-pie-chart";
 
 class Home extends React.Component {
 
@@ -25,14 +38,30 @@ class Home extends React.Component {
             edit_task_name: '',
             task_error: '',
             selected_task: {},
-            selected_index: 0
-        }
+            selected_index: 0,
+            width: 0,
+            height: 0,
+            loader: false
+        };
+        this.updateWindowDimensions = this.updateWindowDimensions.bind(this);
+    }
+
+    componentWillUnmount() {
+        window.removeEventListener('resize', this.updateWindowDimensions);
+    }
+
+    updateWindowDimensions() {
+        this.setState({ width: window.innerWidth, height: window.innerHeight });
     }
 
     componentDidMount() {
+        this.updateWindowDimensions();
+        window.addEventListener('resize', this.updateWindowDimensions);
+
         let user_data = JSON.parse(localStorage.getItem("isLogin"));
         this.setState({name: user_data.token.name,
-        image: 'https://dev.teledirectasia.com:3092/'+ user_data.image})
+            loader: true,
+            image: 'https://dev.teledirectasia.com:3092/'+ user_data.image})
 
         performRequest('get', '/dashboard' )
             .then(response => {
@@ -41,13 +70,20 @@ class Home extends React.Component {
                     tasks_completed: response.data.tasksCompleted,
                     latest_tasks: response.data.latestTasks
                 })
-            });
+            })
+            .catch(error =>{
+            this.setState({loader: false})
+        });
 
         performRequest('get', '/tasks' )
             .then(response => {
                 console.log("HOME2", response)
-                this.setState({tasks: response.data.tasks})
-            })
+                this.setState({tasks: response.data.tasks,
+                    loader: false
+                })
+            }).catch(error =>{
+                this.setState({loader: false})
+        });
     }
 
     handleChange = (e) =>{
@@ -74,6 +110,10 @@ class Home extends React.Component {
         });
     };
 
+    closeHandle = (name) =>{
+        this.setState({[name]: false})
+    };
+
     deleteHandler = (task, index) =>{
         this.setState({
             delete_task_modal: true,
@@ -81,16 +121,6 @@ class Home extends React.Component {
             selected_task: task,
             selected_index: index
         });
-    };
-
-    handleSearch = (e) =>{
-        this.setState({
-            [e.target.name]: e.target.value,
-            // tasks_backup:
-        });
-        // this.state.tasks.map(item =>{
-        //     e.target.value
-        // })
     };
 
     saveTask = () =>{
@@ -114,31 +144,60 @@ class Home extends React.Component {
     };
 
     editTask = () =>{
-        let data = {
-            "name": this.state.edit_task_name,
-            "completed": this.state.selected_task.completed
-        };
-        performRequest('put', '/task/'+ this.state.selected_task._id, null, data)
-            .then(response => {
-                console.log("HOME 4", response)
-                let tasks = [];
-                let i = 0;
-                this.state.tasks.map(item =>{
-                    item.completed && i++;
-                    tasks.push(item)
-                }
-                );
-                tasks[this.state.selected_index] = response.data.task;
-                this.setState({
-                    tasks_completed: i,
-                    edit_task_modal: false,
-                    edit_task_name: '',
-                    task_error: '',
-                    tasks: tasks
+        if (this.state.edit_task_name !== ""){
+            let data = {
+                "name": this.state.edit_task_name,
+                "completed": this.state.selected_task.completed
+            };
+            performRequest('put', '/task/'+ this.state.selected_task._id, null, data)
+                .then(response => {
+                    console.log("HOME 4", response)
+                    let tasks = [];
+                    let i = 0;
+                    this.state.tasks.map(item =>{
+                            item.completed && i++;
+                            tasks.push(item)
+                        }
+                    );
+                    tasks[this.state.selected_index] = response.data.task;
+                    this.setState({
+                        tasks_completed: i,
+                        edit_task_modal: false,
+                        edit_task_name: '',
+                        task_error: '',
+                        tasks: tasks
+                    })
+                }).catch(error=>{
+                let data = {
+                    "name": this.state.edit_task_name,
+                    "completed": this.state.selected_task.completed
+                };
+                performRequest('put', '/task/'+ this.state.selected_task._id, null, data)
+                    .then(response => {
+                        console.log("HOME 4", response)
+                        let tasks = [];
+                        let i = 0;
+                        this.state.tasks.map(item =>{
+                                item.completed && i++;
+                                tasks.push(item)
+                            }
+                        );
+                        tasks[this.state.selected_index] = response.data.task;
+                        this.setState({
+                            tasks_completed: i,
+                            edit_task_modal: false,
+                            edit_task_name: '',
+                            task_error: '',
+                            tasks: tasks
+                        })
+                    }).catch(error=>{
+                    this.setState({task_error: error.response.data.msg});
                 })
-            }).catch(error=>{
-            this.setState({task_error: error.response.data.msg});
-        })
+            })
+        }else {
+            this.setState({task_error: "Enter a valid task"});
+        }
+
     };
 
     deleteTask = () => {
@@ -169,9 +228,15 @@ class Home extends React.Component {
     };
 
     render() {
-        console.log("image", this.state.image)
+        const search_text = this.state.search.toLowerCase();
+        const completedPercentage = (this.state.tasks_completed * 100) / this.state.total_tasks;
         return (
-            <div>
+            this.state.loader ?
+                <div className='container-main'>
+                    <Spinner animation="grow" size='lg' className='spinner'/>
+                </div>
+                :
+            <div className='pb-5'>
                 <Navbar className='custom-nav card-8 mb-4'>
                     <div>
                         <img src={this.state.image} width={50} height={50} className='rounded-circle mr-2 ml-3 object-fit'/>
@@ -184,13 +249,13 @@ class Home extends React.Component {
                     <div className='container'>
                         <div className='row mb-2'>
                             <div className='col-lg-4 col-md-4 col-sm-12 mb-3'>
-                                <Card className='p-4 card-8 radius10'>
+                                <Card className='p-4 card-8 radius10 card-height'>
                                     <span className='mb-3 text-center card-heading'>Tasks completed</span>
                                     <span className='task-completed'>{this.state.tasks_completed} <span className='task-total'>/{this.state.total_tasks}</span></span>
                                 </Card>
                             </div>
                             <div className='col-lg-4 col-md-4 col-sm-12 mb-3'>
-                                <Card className='p-3 card-8 radius10'>
+                                <Card className='p-3 card-8 radius10 card-height'>
                                     <span className='mb-3 text-center card-heading'>Latest Created Tasks</span>
                                     <ul className='pl-3'>
                                         {this.state.latest_tasks.map(item=>
@@ -200,9 +265,34 @@ class Home extends React.Component {
                                 </Card>
                             </div>
                             <div className='col-lg-4 col-md-4 col-sm-12 mb-3'>
-                                <Card className='p-4 card-8 radius10'>
-                                    <span className='mb-3 text-center'>Tasks completed</span>
-                                    <span className='task-completed'>5 <span className='task-total'>/20</span></span>
+                                <Card className='card-8 radius10 card-height'>
+                                    <ReactMinimalPieChart
+                                        animate={true}
+                                        animationDuration={500}
+                                        animationEasing="ease-out"
+                                        totalValue={100}
+                                        data={[
+                                            {
+                                                color: '#E8ECEC',
+                                                title: 'Incompleted tasks',
+                                                value: 100 - completedPercentage
+                                            },
+                                            {
+                                                color: '#5285ec',
+                                                title: 'Completed tasks',
+                                                value: completedPercentage
+                                            }
+                                        ]}
+                                        label={false}
+                                        lengthAngle={360}
+                                        lineWidth={100}
+                                        paddingAngle={0}
+                                        radius={this.state.width < 768 ? 10 : 20}
+                                        style={{marginTop: this.state.width < 478 ? -100 : (this.state.width < 768 ? -170 : (this.state.width < 992 ? -24 : (this.state.width < 1200 ? -60 : -90)))}}
+                                        rounded={false}
+                                        startAngle={90}
+                                    />
+                                    {console.log(this.state.width)}
                                 </Card>
                             </div>
                         </div>
@@ -210,7 +300,7 @@ class Home extends React.Component {
                             <div className='col-lg-6 col-sm-12 mb-sm-3 task-title'>
                                 <span>Tasks</span>
                             </div>
-                            <div className='col-lg-4 col-sm-12 mb-sm-3'>
+                            <div className='col-lg-4 col-sm-12 mb-sm-3 mb-3 mb-lg-0'>
                                 <InputGroup>
                                     <InputGroup.Prepend>
                                         <InputGroup.Text id="basic-addon1" className='search-icon-container'>
@@ -221,17 +311,19 @@ class Home extends React.Component {
                                         placeholder="Search by task name"
                                         value={this.state.search}
                                         name="search"
-                                        onChange={(e) =>this.handleSearch(e)}
+                                        onChange={(e) =>this.handleChange(e)}
                                     />
                                 </InputGroup>
                             </div>
-                            <div className='col-lg-2 col-sm-12 mb-sm-3'>
+                            <div className='col-lg-2 col-sm-12 mb-3 mb-lg-0'>
                                 <Button onClick={()=>this.setState({new_task_modal: true})}><IoMdAdd size={13} className='mb-1'/> New Task</Button>
                             </div>
                         </div>
 
                         <Card className='mb-5 card-8 radius10'>
-                            {this.state.tasks.map((item, index) =>
+                            {this.state.tasks.map((item, index) =>{
+                                if (item.name.toLowerCase().search(search_text) !== -1) {
+                                return(
                                 <div className='row task-row mr-0 ml-0'>
                                     <div className={[item.completed ? 'col-lg-10 pl-0 d-flex decoration' : 'col-lg-10 pl-0 d-flex ']}>
                                         <FormCheck className='mr-3' checked={item.completed} type="checkbox" onClick={()=> this.checkHandle(item, index)}/>
@@ -243,20 +335,25 @@ class Home extends React.Component {
                                     </div>
 
                                 </div>
+                                )}
+                            }
                             )}
                         </Card>
                     </div>
                     :
                     <div className='container-main'>
-                        <Card className='p-4 card-8 login-card radius10'>
-                            <span className='mb-3 text-center'>You have no task.</span>
-                            <Button className='mb-2' onClick={()=>this.setState({new_task_modal: true})}><IoMdAdd size={13} /> New Task</Button>
-                        </Card>
+                        <div className='row col-sm-12 col-md-6 col-lg-4'>
+                            <Card className='p-4 card-8 login-card radius10'>
+                                <span className='mb-3 text-center'>You have no task.</span>
+                                <Button className='mb-2' onClick={()=>this.setState({new_task_modal: true})}><IoMdAdd size={13} /> New Task</Button>
+                            </Card>
+                        </div>
                     </div>
                 }
 
                 <Modal show={this.state.new_task_modal}>
                     <Card className='p-4'>
+                        <MdClose size={20} className='mb-1 mr-1 close-btn' onClick={()=>this.closeHandle("new_task_modal")}/>
                         <span className='mb-3 text-center'><IoMdAdd size={15} />New Task</span>
                         <input type="name" className="form-control" placeholder="Task Name" name="new_task_name" required
                                value={this.state.new_task_name} onChange={(e)=> this.handleChange(e)}/>
@@ -267,6 +364,7 @@ class Home extends React.Component {
 
                 <Modal show={this.state.edit_task_modal}>
                     <Card className='p-4'>
+                        <MdClose size={20} className='mb-1 mr-1 close-btn' onClick={()=>this.closeHandle("edit_task_modal")}/>
                         <span className='mb-3'><GoPencil size={15} className='mb-1 mr-1'/>Edit Task</span>
                         <input type="name" className="form-control" placeholder="Task Name" name="edit_task_name" required
                                value={this.state.edit_task_name} onChange={(e)=> this.handleChange(e)}/>
