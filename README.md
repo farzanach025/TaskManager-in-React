@@ -22,8 +22,9 @@ Folder Structure
 ------asset <br/>
 ------screen <br/>
 ------style <br/>
-----package.json <br/>
-----README
+--package.json <br/>
+--README <br/>
+--External Libraries <br/>
 
 
 
